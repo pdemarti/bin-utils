@@ -6,7 +6,7 @@
 # This is meant to be put in root's crontab, but it can also be run manually to see what happens.
 #
 # A typical crontab entry is:
-# * * * * * block-ssh-attacks.pl >> /var/logs/block-ssh-attackes.log 2>&1
+# * * * * * block-ssh-attacks.pl >> /var/log/block-ssh-attacks.log 2>&1
 #
 # Note that it uses a file lock, so only one instance can run at a time.
 #
