@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+#
+# Computes time difference
+# Example: echo '2012/05/03 10:00, 20120404-192333' | tdiff
+
+use Date::Parse;
+use POSIX qw/strftime/;
+
+# handles:
+# YYYYmmdd-HHMMSS
+# YYYYmmddTHHMMSS
+# YYYY-mm-dd HH:MM:SS
+# YYYY-mm-ddTHH:MM:SS
+# YYYY/mm/ddTHH:MM:SS
+# [YYYY/]mm/dd HH:MM[:SS]
+# [YYYY/]mm/dd
+# HH:MM[:SS]
+sub to_time {
+    local $_ = shift;
+    s/^\s+//; s/\s+$//;
+    s,^(\d{4})(\d{2})(\d{2})[T-](\d{2})(\d{2})(\d{2})$,$1/$2/$3 $4:$5:$6,;
+    my $t = str2time($_);
+    warn "couldn't convert \"$_\" to time\n" if !defined($t);
+    return $t;
+}
+
+while (<>) {
+    my @a = split(/,/,$_,2);
+    my $t0 = to_time($a[0]);
+    my $t1 = to_time($a[1]);
+    my $dt = $t1-$t0;
+    $td = abs($dt);
+    $d  = int($td/86400); $td -= $d*86400;
+    $hh = int($td/3600); $td -= $hh*3600;
+    $mm = int($td/60); $td -= $mm*60;
+    $ss = $td;
+    printf("%d (%dd %02d:%02d:%02d)\t%s %s %s\n",
+	   $dt, $d, $hh, $mm, $ss,
+	   strftime("%Y-%m-%d %H:%M:%S",localtime($t0)),
+	   ($t0 <= $t1) ? "before" : "after",
+	   strftime("%Y-%m-%d %H:%M:%S",localtime($t1)));
+}

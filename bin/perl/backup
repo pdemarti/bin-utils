@@ -1,0 +1,104 @@
+#!/usr/bin/perl
+# PD 18-Dec-06
+#
+# backup a directory tree
+
+use Getopt::Std;
+
+sub err_usage {
+  print STDERR "
+Usage is:
+$0 [-v] [-i] [-R repository-dir] dir
+  create a backup of dir by moving each file into the repository-dir under a name determined by the file's content.
+  only one copy of each unique file is kept.
+  The repository-dir is by default ~/.backup/
+
+  -f:		force the link even if an existing backup file has different mode/uid/gid as the local file
+  -R dir:	use an alternate repository (creates it if non-existant)
+  -i:		in-place. Don't create a backup directory, instead, make the directory itself be a backup
+  -X 'a b ...':	excludes directories a, b, ...
+  -v:		verbose
+";
+  exit @_;
+}
+
+sub try {
+    my $cmd = join(" ", @_);
+    print "$cmd\n" if $opt_v;
+    system($cmd) == 0
+      or die "system $cmd failed: $?";
+}
+
+our $opt_R = $ENV{HOME}."/.backup";
+
+err_usage(200) unless getopts('hfR:X:v');
+err_usage(0) if defined($opt_h);
+err_usage(200) unless scalar(@ARGV) == 1;
+my $dir = shift;
+
+# some readable access to stat
+my %ST =
+  (dev		=>   0,	# device number of filesystem
+   ino		=>   1,	# inode number
+   mode		=>   2,	# file mode  (type and permissions)
+   nlink	=>   3,	# number of (hard) links to the file
+   uid		=>   4,	# numeric user ID of file's owner
+   gid		=>   5,	# numeric group ID of file's owner
+   rdev		=>   6,	# the device identifier (special files only)
+   size		=>   7,	# total size of file, in bytes
+   atime	=>   8,	# last access time in seconds since the epoch
+   mtime	=>   9,	# last modify time in seconds since the epoch
+   ctime	=>  10,	# inode change time in seconds since the epoch (*)
+   blksize	=>  11,	# preferred block size for file system I/O
+   blocks	=>  12,	# actual number of blocks allocated
+  );
+
+mkdir $opt_R unless -d $opt_R;
+my $cmd = "find $dir -type f";
+if ($opt_X) {
+    my @excludes = map { "-path $dir/$_" } (split(/\s+/, $opt_X));
+    my $pruneString = "\\( " . join(" -o ", @excludes) . " \\) -prune";
+    $cmd = "find $dir $pruneString -o -type f -print" if $pruneString =~ /\S/;
+}
+open(F, "$cmd|") or die "can't do $cmd: $!\n";
+while (<F>) {
+    chomp;
+    my @s = stat($_);
+    next if $s[$ST{size}] == 0;
+    my $s = quotemeta($_);
+    my $sum = `md5sum $s`;
+    next if $sum eq '';
+    $sum =~ s/\s+.*\n//;
+    my $backup = "$opt_R/$sum";
+    my @bs;
+    if (-f $backup) {
+	@bs = stat($backup);
+	if ($bs[$ST{size}] != $s[$ST{size}]) {
+	    print STDERR "should be very unusual: files with same md5sum have different size!\n";
+	    print STDERR "  $s[$ST{size}]\t$_\n";
+	    print STDERR "  $bs[$ST{size}]\t$backup\n";
+	    print STDERR "  adding size to the backup name\n";
+	    $backup .= "_$s[$ST{size}]";
+	    @bs = stat($backup);
+	}
+    }
+    if (-f $backup) {
+	if ($bs[$ST{ino}]  == $s[$ST{ino}] &&
+	    $bs[$ST{rdev}] == $s[$ST{rdev}]) {
+	    print "$_ and $backup are already linked\n" if ($opt_v);
+	} elsif (!$opt_f &&
+		 ($bs[$ST{mode}] != $s[$ST{mode}] ||
+		  $bs[$ST{uid}]  != $s[$ST{uid}] ||
+		  $bs[$ST{gid}]  != $s[$ST{gid}])) {
+	    print STDERR "$_ and $backup are identical, but perm/uid/gid differ --won't coalesce without force (-f)\n";
+	} else {
+	    unlink $_;
+	    link($backup,$_) || die "couldn't link $_ to $backup: $!\n";
+	    print "linking $_ to existing backup $backup\n" if ($opt_v);
+	}
+    } else {
+	link($_,$backup) || die "couldn't link $backup to $_: $!\n";
+	print "linking new backup $backup to $_\n" if ($opt_v);
+    }
+}
+close F;

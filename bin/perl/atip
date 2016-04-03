@@ -1,0 +1,25 @@
+#!/usr/bin/perl
+# Get the address of one of my hosts (from $domain/cgi-bin/redirect)
+
+$domain = "www.demartines.com";
+$host = shift || die "usage is $0 hostname";
+$hostIsRegexp = ($host =~ /[\*\?\+]/);
+# print STDERR "host is regexp\n" if $hostIsRegexp;
+use LWP::UserAgent;
+$ua = LWP::UserAgent->new;
+$req = HTTP::Request->new(GET => "http://$domain/cgi-bin/redirect");
+$req->authorization_basic('admin', 'admin');
+$_ = $ua->request($req)->as_string;
+s/\n//gm;
+s/.*<body>(.*?)<\/body>.*/$1/;
+for (split(/\s*<br>\s*/)) {
+    # each line is now:  hostname  ip_address    (no ending newline)
+    my ($hostname, $ip) = split();
+    print STDERR "Got an unexpected reply from $domain:\n". $_ unless $ip =~ /^(\d+\.){3}\d+$/;
+    if ($hostIsRegexp) {
+	print "$_\n" if $hostname =~ /$host/;
+    } else {
+	print "$ip\n" if $hostname eq $host;
+    }
+}
+exit 0;

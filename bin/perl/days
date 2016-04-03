@@ -1,0 +1,14 @@
+#!/usr/bin/perl
+# PD 20080430
+# find how many days have elapse since some given date
+# example: days 2008-02-17
+
+$dthen = shift || die "must provide date: for example  2008-04-30";
+
+use Date::Parse;
+$tthen = str2time($dthen);
+$tnow = time;
+$dthen = scalar(localtime($tthen));
+$dnow  = scalar(localtime($tnow));
+$days = ($tnow-$tthen)/(24*3600);
+printf("%d days ago (then: %d=%s, now: %d=%s)\n", $days, $tthen, $dthen, $tnow, $dnow);

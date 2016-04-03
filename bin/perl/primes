@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+# Generates prime numbers between 2 and $limit
+# Atkin's sieve -- see http://en.wikipedia.org/wiki/Prime_number
+
+$limit = shift || 100;	# arbitrary search limit
+
+
+$sqrtLimit = sqrt($limit);
+
+# initialize the sieve
+# $is_prime[$i] = false for i ∈ [5, limit]	# no need in perl...
+
+# put in candidate primes:
+# integers which have an odd number of
+# representations by certain quadratic forms
+for $x (1 .. $sqrtLimit) {
+    $x2 = $x*$x;
+    for $y (1 .. $sqrtLimit) {
+	$y2 = $y*$y;
+	$n = 4*$x2 + $y2;
+	$is_prime[$n] = 1 - $is_prime[$n] if ($n <= $limit && ($n % 12 == 1 || $n % 12 == 5));
+	$n = 3*$x2+$y2;
+	$is_prime[$n] = 1 - $is_prime[$n] if ($n <= $limit && ($n % 12 == 7));
+	$n = 3*$x2-$y2;
+	$is_prime[$n] = 1 - $is_prime[$n] if ($x > $y && $n <= $limit && ($n % 12 == 11));
+    }
+}
+
+# eliminate composites by sieving
+for $n (5 .. $sqrtLimit) {
+    if ($is_prime[$n] != 0) {
+	my $sqN = $n*$n;
+        # n is prime, omit multiples of its square; this is sufficient because
+        # composites which managed to get on the list cannot be square-free
+        for $i (1 .. $limit/$sqN) {
+	    my $k = $i*$sqN;	# k ∈ {n², 2n², 3n², ..., limit}
+	    $is_prime[$k] = 0;
+	}
+    }
+}
+
+#$start = $limit-1000;
+$start = 1;# unless $start > 1;
+print "2\n3\n" if $start<4;
+for $n ($start .. $limit) {
+    print "$n\n" if $is_prime[$n];
+}

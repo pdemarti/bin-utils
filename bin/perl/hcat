@@ -1,0 +1,36 @@
+#!/usr/bin/perl
+#
+# hcat --  cat files horizontally
+# P. Demartines <pierred@lexicus.mot.com> 30-Oct-1997
+
+require "getopts.pl";
+
+sub err_usage
+  {
+  print "Usage is:\n";
+  print "$0 [-f format] [-n N] [file . . .]\n";
+  print "   -f format:  specifies a one-line format for output (see perl man page)\n";
+  print "   -n N:       asks to put line number in column N\n";
+  print "BUG: the format thing will appear later, when I will have time to implement it...\n";
+  exit @_;
+  }
+
+# if (!&Getopts('f:n:')) {do err_usage(200);}
+if (!&Getopts('')) {do err_usage(200);}
+
+foreach $n ($[ .. $#ARGV) {
+    $fhandle[$n] = "fh_$n";
+    open($fhandle[$n], $ARGV[$n]) || die "Can't open $ARGV[$n]";
+}
+
+$atleastoneok = 1;
+while ($atleastoneok) {
+    undef @line;
+    $atleastoneok = 0;
+    foreach $f (@fhandle) {
+	($sub = <$f>) =~ s/\n+//;
+	push(@line, $sub);
+	eof($f) || ($atleastoneok = 1);
+    }
+    print join(" ", @line),"\n";
+}

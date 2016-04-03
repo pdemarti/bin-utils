@@ -1,0 +1,38 @@
+#!/usr/bin/perl
+
+use POSIX qw/strftime/;
+use Time::HiRes qw(sleep time);
+use Getopt::Std;
+
+our $opt_f = 1;
+sub err_usage {
+  print STDERR "
+Usage is:
+$0 [-f frequency]
+  -h:           help; print this and exit
+  -f frequency: update frequency times per second (default: $opt_f)
+";
+  exit @_;
+}
+
+err_usage(200) unless getopts('hf:');
+err_usage(0) if $opt_h;
+
+my $period = 1000.0/$opt_f;
+my $t0 = int(time());
+
+$| = 1;
+my $t = time();
+my $localtz = strftime("%Z", localtime(time));
+while (1) {
+    my $millis = int(($t - $t0)*1000); # millis since t0
+    my $lt = sprintf("%s.%03d %s", strftime("%Y%m%d-%H%M%S", localtime($t)), $millis%1000, $localtz);
+    my $ut = sprintf("%s.%03d %s", strftime("%Y%m%d-%H%M%S", gmtime($t)), $millis%1000, 'UTC');
+    printf("\r%s   %s ", $lt, $ut);
+    my $target = $t + ($period - $millis%$period)*0.001;
+    do {
+	my $dt = $target - $t;
+	sleep($dt);
+	$t = time();
+    } while ($t < $target);
+}

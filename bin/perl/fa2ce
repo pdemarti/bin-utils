@@ -1,0 +1,8 @@
+#!/usr/bin/perl -n
+#
+# Converts Farenheit to Celsius
+# P. Demartines <pierred@lexicus.mot.com>  4-Aug-1998
+
+if (/(\-?(\d*\.\d+|\d+\.?))/) {
+    printf("%g °F  -->  %g °C\n", $1, ($1 - 32)*5/9);
+}

@@ -1,0 +1,298 @@
+#!/usr/bin/perl -n
+#
+# Help to find an ascii code and its equivalents.
+#
+# Examples of valid inputs:
+#
+# 0330  (octal 330)
+# 0xD8  (hexa D8)
+# 0xd8  (hexa D8)
+# 216   (decimal 216)
+# /O    (Ø)
+#
+# all those above refer to the same character:
+# Ø 216 \330 0xD8
+#
+# Other possible inputs (example):
+#
+# 'e é  (acute)
+# `e è  (grave)
+# ^e ê  (circumflex)
+# "e ë  (umlaut)
+# ~n ñ  (tilde)
+# ,c ç  (cedilla)
+# ss ß  (ssharp)
+# *a å  (ring)
+# /o ø  (oslash)
+# !! ¡  (exclamdown)
+# ?? ¿  (questiondown)
+# << «
+# >> »
+# -, ¬
+#
+# In summary, this is very much like x-compose.el
+#
+# P. Demartines <pierred@lexicus.mot.com>  9-Sep-1997
+
+binmode STDOUT, ":encoding(utf8)";
+
+%descr =
+  (
+   '!','exclamation-mark',
+   '"','double-quote',
+   '#','hash',
+   '\$','dollar',
+   '%','percent',
+   '&','ampersand',
+   '\'','single-quote',
+   '(','left-parenthesis',
+   ')','right-parenthesis',
+   '*','star',
+   '+','plus',
+   ',','comma',
+   '-','dash',
+   '.','period',
+   '/','slash',
+   '0','0',
+   '1','1',
+   '2','2',
+   '3','3',
+   '4','4',
+   '5','5',
+   '6','6',
+   '7','7',
+   '8','8',
+   '9','9',
+   ':','colon',
+   ';','semi-colon',
+   '<','smaller-than',
+   '=','equal',
+   '>','greater-than',
+   '?','question-mark',
+   '@','@',
+   'A','A',
+   'B','B',
+   'C','C',
+   'D','D',
+   'E','E',
+   'F','F',
+   'G','G',
+   'H','H',
+   'I','I',
+   'J','J',
+   'K','K',
+   'L','L',
+   'M','M',
+   'N','N',
+   'O','O',
+   'P','P',
+   'Q','Q',
+   'R','R',
+   'S','S',
+   'T','T',
+   'U','U',
+   'V','V',
+   'W','W',
+   'X','X',
+   'Y','Y',
+   'Z','Z',
+   '[','left-bracket',
+   '\\','backslash',
+   ']','right-bracket',
+   '^','hat',
+   '_','underscore',
+   '`','back-quote',
+   'a','a',
+   'b','b',
+   'c','c',
+   'd','d',
+   'e','e',
+   'f','f',
+   'g','g',
+   'h','h',
+   'i','i',
+   'j','j',
+   'k','k',
+   'l','l',
+   'm','m',
+   'n','n',
+   'o','o',
+   'p','p',
+   'q','q',
+   'r','r',
+   's','s',
+   't','t',
+   'u','u',
+   'v','v',
+   'w','w',
+   'x','x',
+   'y','y',
+   'z','z',
+   '{','left-curly-brace',
+   '|','vertical-bar',
+   '}','right-curly-brace',
+   '~','tilde',
+   '¡','exclamation-down',
+   '¢','cent',
+   '£','pound-sterling',
+   '¤','paragraph',
+   '¥','yen',
+   '¦','¦',
+   '§','section',
+   '©','copyright',
+   '«','left-guillemet',
+   '¬','¬',
+   '´','apostrophe',
+   'µ','mu',
+   '¶','pi',
+   'º','degree',
+   '»','right-guillemet',
+   '¼','1/4',
+   '½','1/2',
+   '¾','3/4',
+   '¿','question-down',
+   'À','A-grave',
+   'Á','A-acute',
+   'Â','A-circumflex',
+   'Ã','A-tilde',
+   'Ä','A-diaeresis',
+   'Å','A-ring',
+   'Æ','AE-ligature',
+   'Ç','C-cedilla',
+   'È','E-grave',
+   'É','E-acute',
+   'Ê','E-circumflex',
+   'Ë','E-diaeresis',
+   'Ì','I-grave',
+   'Í','I-acute',
+   'Î','I-circumflex',
+   'Ï','I-diaeresis',
+   'Ð','ETH',
+   'Ñ','N-tilde',
+   'Ò','O-grave',
+   'Ó','O-acute',
+   'Ô','O-circumflex',
+   'Õ','O-tilde',
+   'Ö','O-diaeresis',
+   '×','cross',
+   'Ø','emptyset',
+   'Ù','U-grave',
+   'Ú','U-acute',
+   'Û','U-circumflex',
+   'Ü','U-diaeresis',
+   'Ý','Y-acute',
+   'Þ','Þ',
+   'ß','esset',
+   'à','a-grave',
+   'á','a-acute',
+   'â','a-circumflex',
+   'ã','a-tilde',
+   'ä','a-diaeresis',
+   'å','a-ring',
+   'æ','ae-ligature',
+   'ç','c-cedilla',
+   'è','e-grave',
+   'é','e-acute',
+   'ê','e-circumflex',
+   'ë','e-diaeresis',
+   'ì','i-grave',
+   'í','i-acute',
+   'î','i-circumflex',
+   'ï','i-diaeresis',
+   'ð','ð',
+   'ñ','n-tilde',
+   'ò','o-grave',
+   'ó','o-acute',
+   'ô','o-circumflex',
+   'õ','o-tilde',
+   'ö','o-diaeresis',
+   '÷','divide',
+   'ø','o-slash',
+   'ù','u-grave',
+   'ú','u-acute',
+   'û','u-circumflex',
+   'ü','u-diaeresis',
+   'ý','y-acute',
+   'þ','þ',
+   'ÿ','y-diaeresis');
+
+s/\s//g;
+if (/^(0x|\\)?\d\d+$/) {
+    # numerical form
+    s/\\/0/;
+    $val = $_;
+    $val = oct($val) if $val =~ /^0/;
+    $_ = sprintf("%c", $val);
+} else {
+    # compose form
+    s/\!\!/¡/;
+    s/\|[cC]/¢/;
+    s/\?\?/¿/;
+    s/\`A/À/;
+    s/\'A/Á/;
+    s/\^A/Â/;
+    s/\~A/Ã/;
+    s/\"A/Ä/;
+    s/\*A/Å/;
+    s/AE/Æ/;
+    s/,C/Ç/;
+    s/\`E/È/;
+    s/\'E/É/;
+    s/\^E/Ê/;
+    s/\"E/Ë/;
+    s/\`I/Ì/;
+    s/\'I/Í/;
+    s/\^I/Î/;
+    s/\"I/Ï/;
+    s/\~N/Ñ/;
+    s/\`O/Ò/;
+    s/\'O/Ó/;
+    s/\^O/Ô/;
+    s/\~O/Õ/;
+    s/\"O/Ö/;
+    s/\/O/Ø/;
+    s/\`U/Ù/;
+    s/\'U/Ú/;
+    s/\^U/Û/;
+    s/\"U/Ü/;
+    s/\'Y/Ý/;
+    s/(ss|SS)/ß/;
+    s/\`a/à/;
+    s/\'a/á/;
+    s/\^a/â/;
+    s/\~a/ã/;
+    s/\"a/ä/;
+    s/\*a/å/;
+    s/ae/æ/;
+    s/\,c/ç/;
+    s/\`e/è/;
+    s/\'e/é/;
+    s/\^e/ê/;
+    s/\"e/ë/;
+    s/\`i/ì/;
+    s/\'i/í/;
+    s/\^i/î/;
+    s/\"i/ï/;
+    s/\~n/ñ/;
+    s/\`o/ò/;
+    s/\'o/ó/;
+    s/\^o/ô/;
+    s/\~o/õ/;
+    s/\"o/ö/;
+    s/\/o/ø/;
+    s/\`u/ù/;
+    s/\'u/ú/;
+    s/\^u/û/;
+    s/\"u/ü/;
+    s/\'y/ý/;
+    s/\"y/ÿ/;
+    s/\<\</\«/;
+    s/\>\>/\»/;
+    s/-,/\¬/;
+}
+if (/^.$/) {
+    # literal form
+    $chr = $&;
+    $val = ord($chr);
+    print sprintf("%c %3d \\%03o 0x%02X %s\n", $val, $val, $val, $val, $descr{sprintf("%c", $val)});
+} else {print "don't recognize: $_\n";}

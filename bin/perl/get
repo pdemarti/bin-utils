@@ -1,0 +1,109 @@
+#!/usr/bin/perl
+# the two indices 'a' and 'b' can also be letters, like:
+#     aaa abz (gives: aab aac ... aaz aba abc abd ... abz)
+
+use Getopt::Std;
+
+our $opt_s = 10000;
+
+sub err_usage {
+    print STDERR "
+Usage is:
+$0 [-v] [-n] [-s size] url                   or
+$0 [-v] [-n] [-s size] [s0 s1 ...] or
+$0 [-v] [-n] [-s size]
+
+  1st form: download the url specified.
+  2nd form: join the strings s0..sn, but if any string is of the form
+  a:b then iterate from a to b for that string. When several such
+  strings are found, the urls downloaded are the full outer join of all
+  iterations. For example: foo_ a:z _bar_ 00:99 .jpg will try to
+  download all of:
+  foo_a_bar_00.jpg foo_a_bar_01.jpg ... foo_a_bar_99.jpg
+  foo_b_bar_00.jpg foo_b_bar_01.jpg ... foo_b_bar_99.jpg
+  ...
+  foo_z_bar_00.jpg foo_z_bar_01.jpg ... foo_z_bar_99.jpg
+
+  If parameters are omitted (3rd form), then read stdio, look for them
+  on each input line (1st or 2nd form) and download as appropriate.
+
+  -s size: don't save files smaller than size (bytes) --default is $opt_s bytes
+  -f:      download files that already exist
+  -v:	   verbose
+";
+    exit @_;
+}
+
+use HTTP::Lite;
+use File::Basename;
+
+err_usage(200) unless getopts('hfs:v');
+err_usage(0) if defined($opt_h);
+
+if (@ARGV) {
+    $ARGV[0] =~ s,^http://,,;
+    push @lines,generate(@ARGV);
+} else {
+    while (<>) {
+	if (/\S/) {
+	    s/^\s+//; s/\s+$//; s,^http://,,;
+	    push @lines,generate(split);
+	} else {
+	    warn "bad line $.: $_\n";
+	}
+    }
+}
+print "will get ",scalar(@lines)," files:\n",join("\n",@lines),"\n" if $opt_v;
+# (doesn't work well... --doesn't show when doing a `jobs`)
+## from here, run as background task
+#die "Can't fork: $!" unless defined(my $pid = fork);
+#exit if $pid;
+
+print "min size is $opt_s\n" if $opt_v;
+$http = new HTTP::Lite;
+
+exit if fork();
+for my $url (@lines) {
+    $fname = $url;
+    $fname =~ s|/|\#|g;
+    my $skip = (-f $fname) && !$opt_f;
+    printf "url = $url;  file = $fname".($skip?" (skipping -- already exists)":"") if $opt_v;
+    if ($req = $http->request("http://$url")) {
+	$s = $http->body();
+	if (/Not Found/) {
+	    warn "$url 404 Not Found";
+	} else {
+	    if (length($s) < $opt_s) {
+		# too small
+		print STDERR "$fname :  ", length($s), " bytes (not saved)\n" if $opt_v;
+	    } else {
+		open(OUT, ">$fname") || die "can't write $!";
+		binmode OUT; # otherwise it screws up the output into utf8...
+		print OUT $s;
+		close OUT;
+		print STDERR "$fname :  ", length($s), " bytes\n" if $opt_v;
+	    }
+	}
+	$http->reset();
+    } else {
+	warn "Unable to get $!";
+    }
+}
+exit 0;
+
+sub generate {
+    if (scalar(@_)==1) {
+        return @_;
+    } else {
+        return map {join('', @$_)} (cartesian(map {/(.*):(.*)/ ? [$1..$2] : [split(/,/)]} @_));
+    }
+}
+
+sub cartesian {
+    my $last = pop;
+    return map([$_], @$last) unless @_;
+    return map {
+	my $left = $_;
+	map([@$left, $_], @$last)
+    } cartesian(@_);
+}

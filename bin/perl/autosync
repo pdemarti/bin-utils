@@ -1,0 +1,79 @@
+#!/usr/bin/perl
+#----------------------------------------------------------------------
+# PD 20091125
+# launch a "constant sync" between a local dir toward another dir
+# (typically remote) The process looks constantly for new modifications
+# and, when found, launches an rsync to the dest dir
+#----------------------------------------------------------------------
+
+use Getopt::Std;
+use POSIX qw/strftime/;
+
+our $opt_a = '-az --delete --exclude=".svn/"';
+our $opt_d = 1;
+our $opt_T = 12;
+our $opt_v;
+
+sub err_usage {
+  print STDERR "
+Usage is:
+$0 [-h] [-a 'args'] [-v] localdir remotedir
+  -h:        print help and exit
+  -a args:   rsync args. Default: '$opt_a'
+  -d delay:  time interval between checks, in seconds. Default: $opt_d.
+  -T nhours: run period (in hours); when greater than zero, then autosync stops after nhours. Default: $opt_T.
+  -v:       verbose
+";
+  exit @_;
+}
+
+err_usage(200) unless getopts('hva:d:T:');
+err_usage(0) if $opt_h;
+
+my $src = shift || err_usage(200);
+my $dst = shift || err_usage(200);
+
+select STDOUT; $|=1;
+my $tsfile = "/tmp/.autosync.$$";
+my $rsync  = "rsync $opt_a $src $dst";
+my $find   = $opt_v ? "find $src -newer $tsfile" : "find $src -newer $tsfile -prune";
+my $expire = $opt_T > 0 ? time+int($opt_T*3600+0.5) : undef;
+printf("will stop at %s\n", strftime("%D %H:%M:%S", localtime($expire)));
+
+print "will use timestamp: $tsfile\n";
+print "rsync command is: $rsync\n";
+sleep 2;
+unlink $tsfile;
+qx{touch -t 197001010000 $tsfile};
+while (1 == 1) {
+    printf("\r%s ", strftime("%H:%M:%S", localtime(time)));
+    if ($expire) {
+	my $remaining = $expire-time;
+	$remaining = 0 if $remaining < 0;
+	my $rdays = int($remaining / (24*3600)); $remaining -= $rdays*24*3600;
+	my $str = $rdays > 0 ? sprintf("%dd+", $rdays) : "";
+        printf("(%s%s left) ", $str, strftime("%H:%M:%S", gmtime($remaining)));
+	if ($remaining <= 0) {
+	    print "exiting.\n";
+	    exit(0);
+	}
+    }
+	
+    my $changes = qx{$find};
+    if ($changes =~ /\S/) {
+	print "change detected\n";
+	qx{touch $tsfile};
+	my $ts = time;
+	if ($opt_v) {
+	    for my $f (split(/\n/, $changes)) {
+		my @s = stat($f) || next;
+		printf("  %s %s\n", strftime("%H:%M:%S", localtime($s[10])), $f);
+	    }
+	}
+	my $t0 = time;
+	qx{$rsync};
+	my $dt = time-$t0;
+	printf("%s updated in %s\n", strftime("%H:%M:%S", localtime(time)), strftime("%M:%S", gmtime($dt)));
+    }	
+    sleep $opt_d;
+}
