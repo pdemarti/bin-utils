@@ -9,56 +9,72 @@
 use Getopt::Std;
 use POSIX qw/strftime/;
 
-our $opt_a = '-az --delete --exclude=".svn/"';
+our $opt_e = '.svn/ .git/ .idea/';
+our $opt_a = '-az --delete $excluded --delete-excluded ';
 our $opt_d = 1;
-our $opt_T = 12;
+our $opt_T = 4;
 our $opt_v;
 
 sub err_usage {
   print STDERR "
 Usage is:
 $0 [-h] [-a 'args'] [-v] localdir remotedir
-  -h:        print help and exit
-  -a args:   rsync args. Default: '$opt_a'
-  -d delay:  time interval between checks, in seconds. Default: $opt_d.
+  -h:       print help and exit
+  -a args:  rsync args. Default: '$opt_a'. The special value '\$excluded' is replaced by a list of the items
+            to exclude.
+  -d delay: time interval between checks, in seconds. Default: $opt_d.
+  -e excl:  Replace exclusion list. Default: '$opt_e'.
+  -x excl:  Additional exclusion list (to be added to \$opt_e. Default: none.
   -T nhours: run period (in hours); when greater than zero, then autosync stops after nhours. Default: $opt_T.
   -v:       verbose
 ";
   exit @_;
 }
 
-err_usage(200) unless getopts('hva:d:T:');
+err_usage(200) unless getopts('hva:d:e:x:T:');
 err_usage(0) if $opt_h;
 
 my $src = shift || err_usage(200);
 my $dst = shift || err_usage(200);
 
-select STDOUT; $|=1;
 my $tsfile = "/tmp/.autosync.$$";
-my $rsync  = "rsync $opt_a $src $dst";
-my $find   = $opt_v ? "find $src -newer $tsfile" : "find $src -newer $tsfile -prune";
+$opt_e .= " $opt_x" if $opt_x;
+my $find  = "find $src -newer $tsfile -print -quit";
+if ($opt_e) {
+  my $exclfind = join(" -o ", map { s,/+$,,; sprintf("-name '$_' -prune") } (split(/\s/, $opt_e)));
+  $find =  "find $src $exclfind -o -newer $tsfile -print -quit";
+}
+my $excluded = join(" ", map { sprintf("--exclude '$_'") } (split(/\s/, $opt_e)));
+my $rsync_args = $opt_a;
+$rsync_args =~ s/\$excluded\b/$excluded/g;
+my $rsync  = "rsync $rsync_args $src $dst";
+
+print "rsync_args = $rsync_args\n" if $opt_v;
 my $expire = $opt_T > 0 ? time+int($opt_T*3600+0.5) : undef;
 printf("will stop at %s\n", strftime("%D %H:%M:%S", localtime($expire)));
 
+select STDOUT; $|=1;
 print "will use timestamp: $tsfile\n";
-print "rsync command is: $rsync\n";
+print "rsync command is: $rsync\n" if $opt_v;
+print "find command is: $find\n" if $opt_v;
+
 sleep 2;
 unlink $tsfile;
 qx{touch -t 197001010000 $tsfile};
 while (1 == 1) {
     printf("\r%s ", strftime("%H:%M:%S", localtime(time)));
     if ($expire) {
-	my $remaining = $expire-time;
-	$remaining = 0 if $remaining < 0;
-	my $rdays = int($remaining / (24*3600)); $remaining -= $rdays*24*3600;
-	my $str = $rdays > 0 ? sprintf("%dd+", $rdays) : "";
-        printf("(%s%s left) ", $str, strftime("%H:%M:%S", gmtime($remaining)));
-	if ($remaining <= 0) {
-	    print "exiting.\n";
-	    exit(0);
-	}
+        my $remaining = $expire-time;
+        $remaining = 0 if $remaining < 0;
+        my $rdays = int($remaining / (24*3600)); $remaining -= $rdays*24*3600;
+        my $str = $rdays > 0 ? sprintf("%dd+", $rdays) : "";
+            printf("(%s%s left) ", $str, strftime("%H:%M:%S", gmtime($remaining)));
+        if ($remaining <= 0) {
+            print "exiting.\n";
+            exit(0);
+        }
     }
-	
+
     my $changes = qx{$find};
     if ($changes =~ /\S/) {
 	print "change detected\n";
