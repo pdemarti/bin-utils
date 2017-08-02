@@ -29,6 +29,7 @@ err_usage(0) if $opt_h;
 #err_usage(200) unless defined($opt_c) && defined($opt_t);
 
 while (<>) {
+  next if defined($first_ts) and not eof;
   if (/$opt_e/) {
     $ts = $&;
     $first_ts = $ts unless defined $first_ts;
