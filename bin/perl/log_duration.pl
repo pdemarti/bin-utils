@@ -10,7 +10,8 @@ use Date::Parse qw/str2time/;
 use POSIX qw/strftime/;
 
 our $opt_e = qr/\d{4}-\d{2}-\d{2}[ T]\d\d:\d\d:\d\d/;
-our $opt_s = 8000;
+our $opt_s = 40000;
+our $opt_k = 1000;
 
 sub err_usage {
   print STDERR "
@@ -18,6 +19,7 @@ Usage is:
 $0 [OPTIONS] [files...]
   -h:        help; print this and exit
   -s nbytes: seek nbytes before the end to look for the last lines (default $opt_s).
+  -k nlines: seek a timestamp within the last nlines before the end (default $opt_k).
   -v:        verbose: print first and last lines where a timestamp was found, to show where they come from.
 
 Compute and display the time difference between the last line (containing a timestamp) and the first line
@@ -31,7 +33,7 @@ then pipe that to log_duration.pl.
   exit @_;
 }
 
-err_usage(200) unless getopts('hv');
+err_usage(200) unless getopts('hvs:k:');
 err_usage(0) if $opt_h;
 #err_usage(200) unless defined($opt_c) && defined($opt_t);
 
@@ -54,8 +56,8 @@ sub get_last {
   my $fh = shift;
   return if eof($fh);
   my $pos = tell($fh);
-  my $blksize = 8000;
-  my $klines = 100;
+  my $blksize = $opt_s;
+  my $klines = $opt_k;
   local $_;
   if (seek($fh, -$blksize, 2)) {
     #printf("seekable; pos = %d, tell = %d\n", $pos, tell($fh));
