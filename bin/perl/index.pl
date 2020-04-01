@@ -33,6 +33,7 @@ Usage is:
 $0 [OPTIONS] [dir]
   OPTIONS:
   -h:      help; print this and exit.
+  -a:      list all files from the filesystem containing dir, instead of just the files under dir.
   -c:      print the DDL to create the table.
   -m time: don't compute the md5 of files older than that time (seconds since the epoch).
   -d:      just print information on the mounted devices and exit
@@ -42,7 +43,7 @@ $0 [OPTIONS] [dir]
   exit @_;
 }
 
-err_usage(200) unless getopts('hcm:di:n:');
+err_usage(200) unless getopts('ahcm:di:n:');
 err_usage(0) if $opt_h;
 err_usage(200) if $opt_i >= $opt_n;
 
@@ -64,7 +65,7 @@ sub rowout {
 
 sub get_info {
     my $topdir = shift;
-    my $cmd = "df -B 1 -P -l \"$topdir\"";
+    my $cmd = "df -k -P -l \"$topdir\"";
     local $_ = qx{$cmd};
     # skip header
     s/[^\n]*\n//m;
@@ -105,6 +106,8 @@ sub get_md5 {
 }
 
 sub process {
+#    my $ccwd = qx{pwd};
+#    print STDERR "process of '$_'\ncwd=$ccwd\n";
     my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
         $atime,$mtime,$ctime,$blksize,$blocks) = lstat($_);
     return unless !($File::Find::prune |= ($dev != $File::Find::topdev));
@@ -117,17 +120,17 @@ sub process {
 if ($opt_d) {
     if ($opt_c) {
 	print "
-  exec    int,   -- exec time
-  dev     int,   -- device number of filesystem
-  devnm   text,  -- device name
-  type    text,  -- filesystem type
-  total   int8,  -- total size, in bytes
-  used    int8,  -- size used, in bytes
-  avail   int8,  -- size available, in bytes
-  pct     int,   -- percent used
-  mounted text,  -- mountpoint
-  uuid    text,  -- uuid of the device
-  label   text   -- label of the device
+  exec    int,   -- 0: exec time
+  dev     int,   -- 1: device number of filesystem
+  devnm   text,  -- 2: device name
+  type    text,  -- 3: filesystem type
+  total   int8,  -- 4: total size, in bytes
+  used    int8,  -- 5: size used, in bytes
+  avail   int8,  -- 6: size available, in bytes
+  pct     int,   -- 7: percent used
+  mounted text,  -- 8: mountpoint
+  uuid    text,  -- 9: uuid of the device
+  label   text   --10: label of the device
 ";
     } else {
 	rowout(time,get_info($topdir)) if $opt_i == 0;
@@ -135,26 +138,26 @@ if ($opt_d) {
 } else {
     if ($opt_c) {
 	print "
-  exec  int,   -- exec time
-  dev   int,   -- device number of filesystem
-  ino   int,   -- inode number
-  mode  int,   -- file mode  (type and permissions)
-  nlink int,   -- number of (hard) links to the file
-  uid   int,   -- numeric user ID of file's owner
-  gid   int,   -- numeric group ID of file's owner
-  size  int8,  -- total size of file, in bytes
-  atime int,   -- last access time in seconds since the epoch
-  mtime int,   -- last modify time in seconds since the epoch
-  ctime int,   -- inode change time in seconds since the epoch
-  md5   text,  -- md5sum of the file's content
-  path  text   -- path relative to mountpoint
+  exec  int,   --  0: exec time
+  dev   int,   --  1: device number of filesystem
+  ino   int,   --  2: inode number
+  mode  int,   --  3: file mode  (type and permissions)
+  nlink int,   --  4: number of (hard) links to the file
+  uid   int,   --  5: numeric user ID of file's owner
+  gid   int,   --  6: numeric group ID of file's owner
+  size  int8,  --  7: total size of file, in bytes
+  atime int,   --  8: last access time in seconds since the epoch
+  mtime int,   --  9: last modify time in seconds since the epoch
+  ctime int,   -- 10: inode change time in seconds since the epoch
+  md5   text,  -- 11: md5sum of the file's content
+  path  text   -- 12: path relative to mountpoint
 ";
     } else {
 	my ($dev,$devnm,$type,$total,$used,$avail,$pct,$mounted,$uuid,$label) = get_info($topdir);
 	$topdir = File::Spec->abs2rel(Cwd::realpath($topdir), $mounted);
         $topdir = '.' unless $topdir=~/\S/;
         print STDERR "topdir=$topdir\nimounted=$mounted\n\n";
-	chdir $mounted;
+        chdir $mounted;
 	File::Find::find({ wanted => \&process}, $topdir);
     }
 }
